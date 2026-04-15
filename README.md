@@ -100,23 +100,23 @@ Open your browser at **http://localhost:8501**
 ## 🧪 Sample Mystery to Try
 
 **Case Description:**
-Lord Blackwood was found dead in his locked study at Blackwood Manor. 
+Taha was found dead in his locked study at Blackwood Manor. 
 The time of death is estimated between 9 PM and 11 PM. 
 A half-empty glass of whiskey sat on his desk. No signs of forced entry.
 
 **Clues:**
-- A monogrammed handkerchief with the initials "V.B." was found under the desk
+- A monogrammed handkerchief with the initials "N.U." was found under the desk
 - The poison used was cyanide, tasteless and odorless when dissolved in alcohol
 - The manor's back door was unlocked despite the butler claiming to have locked it at 8 PM
-- A recent will discovered shows Lord Blackwood changed his beneficiary last week
-- The kitchen staff reported hearing an argument between Lord Blackwood and his niece Victoria at 8:30 PM
+- A recent will discovered shows Taha changed his beneficiary last week
+- The kitchen staff reported hearing an argument between Taha and his niece Naushin Usman at 8:30 PM
 - Footprints in the garden match a woman's shoe size 6
 
 **Suspects:**
-- Victoria Blackwood (niece, recently cut from the will)
-- James the butler (employed for 20 years, recently passed over for a raise)
-- Dr. Helena Marsh (family physician, secret affair with the lord)
-- Thomas Blackwood (estranged son, returned from abroad last week)
+- Naushin Usman (niece, recently cut from the will)
+- Manohar the butler (employed for 20 years, recently passed over for a raise)
+- Dr. Saniya (family physician, secret affair with the lord)
+- Jameel (estranged son, returned from abroad last week)
 
 ---
 

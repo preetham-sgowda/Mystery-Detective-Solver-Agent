@@ -740,76 +740,101 @@ def load_case_into_faiss(clues: str):
 
 
 def generate_case_pdf() -> bytes:
-    """Generate a PDF report of the active case and conversation."""
-    pdf = FPDF()
+    """Robustly generate a PDF report with aggressive string cleaning and layout safety."""
+    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf.set_margins(15, 15, 15)
     pdf.add_page()
+    epw = pdf.w - 2 * pdf.l_margin # Effective page width for explicit control
     
     def safe_text(txt):
-        if not isinstance(txt, str):
-            txt = str(txt)
-        txt = txt.replace("—", "-").replace("🕵️", "Det.").replace("⚠️", "Warning:")
+        if not txt:
+            return ""
+        txt = str(txt)
+        # Normalize line endings
+        txt = txt.replace("\r\n", "\n").replace("\r", "\n")
+        # Direct character simplification for core Helvetica
+        repl = {
+            "\u2014": "-", "\u2013": "-", "\u201c": '"', "\u201d": '"',
+            "\u2018": "'", "\u2019": "'", "\u2022": "*", "\u2026": "..."
+        }
+        for k, v in repl.items():
+            txt = txt.replace(k, v)
         
-        # FPDF crashes if it hits a massive string without any spaces (like a long URL or markdown divider)
-        # We forcefully add a space into any unbroken sequence of 60+ characters to allow wrapping.
-        txt = re.sub(r'(\S{60})', r'\1 ', txt)
+        # Kill emojis / specialized unicode that FPDF standard fonts don't handle
+        txt = txt.replace("🕵️", "Det.").replace("⚠️", "Warning:").replace("⚖️", "Verdict:")
+        txt = txt.encode('latin-1', 'replace').decode('latin-1')
         
-        # Simplify text characters for standard helvetica and replace unicode
-        return txt.encode('latin-1', 'replace').decode('latin-1')
+        # Aggressive Break: FPDF crashes if a single string (no spaces) is wider than column.
+        # We break ANY unbroken token longer than 40 chars.
+        parts = []
+        for word in txt.split(" "):
+            if len(word) > 40:
+                # Inject a space every 40 chars
+                word = re.sub(r"(\S{40})", r"\1 ", word)
+            parts.append(word)
+        return " ".join(parts).strip()
 
-    pdf.set_font("helvetica", style="B", size=16)
-    pdf.cell(0, 10, "Mystery Detective Case Report", new_x="LMARGIN", new_y="NEXT", align="C")
-    pdf.ln(5)
+    # Title
+    pdf.set_font("helvetica", style="B", size=18)
+    pdf.cell(epw, 12, "MYSTERY CASE REPORT", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("helvetica", size=10)
+    pdf.cell(epw, 6, "CONFIDENTIAL - INVESTIGATIVE USE ONLY", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(8)
     
-    # 1. Case Details
+    # 1. Case Overview
     pdf.set_font("helvetica", style="B", size=14)
-    pdf.cell(0, 8, "Initial Case Details:", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(epw, 10, "1. Case Overview", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("helvetica", size=11)
-    pdf.multi_cell(0, 6, safe_text(st.session_state.case_description))
-    pdf.ln(4)
+    pdf.multi_cell(epw, 6, safe_text(st.session_state.case_description))
+    pdf.ln(5)
 
     if st.session_state.suspects.strip():
         pdf.set_font("helvetica", style="B", size=12)
-        pdf.cell(0, 8, "Suspects:", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(epw, 8, "Suspects:", new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("helvetica", size=11)
-        pdf.multi_cell(0, 6, safe_text(st.session_state.suspects))
-        pdf.ln(2)
+        pdf.multi_cell(epw, 6, safe_text(st.session_state.suspects))
+        pdf.ln(3)
 
     if st.session_state.clues.strip():
         pdf.set_font("helvetica", style="B", size=12)
-        pdf.cell(0, 8, "Initial Clues:", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(epw, 8, "Initial Clues:", new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("helvetica", size=11)
-        pdf.multi_cell(0, 6, safe_text(st.session_state.clues))
-        pdf.ln(6)
+        pdf.multi_cell(epw, 6, safe_text(st.session_state.clues))
+        pdf.ln(8)
 
-    # 2. Conversation
+    # 2. History
     if st.session_state.messages:
         pdf.set_font("helvetica", style="B", size=14)
-        pdf.cell(0, 8, "Investigation Log:", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(epw, 10, "2. Investigation Log", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
         for msg in st.session_state.messages:
-            role = "Detective" if msg["role"] == "assistant" else "Investigator"
-            content = safe_text(msg["content"])
+            role = "DET." if msg["role"] == "assistant" else "USER"
+            content = msg["content"]
+            # Scrub raw json
+            content = re.sub(r"```json.*?```", "[Result compiled below]", content, flags=re.DOTALL)
+            content = re.sub(r'\{[^{}]*"culprit"[^{}]*\}', "[Result compiled below]", content, flags=re.DOTALL)
             
-            # Hide raw JSON
-            content_clean = re.sub(r"```json.*?```", "[System: JSON format saved internally]", content, flags=re.DOTALL)
-            content_clean = re.sub(r'\{[^{}]*"culprit"[^{}]*\}', "[System: JSON format saved internally]", content_clean, flags=re.DOTALL).strip()
-            
-            pdf.set_font("helvetica", style="B", size=11)
-            pdf.multi_cell(0, 6, f"{role}:")
-            pdf.set_font("helvetica", size=11)
-            pdf.multi_cell(0, 6, content_clean)
-            pdf.ln(3)
+            # Use specific style for Detective
+            pdf.set_font("helvetica", style="B", size=10)
+            pdf.cell(epw, 6, f"> {role}:", new_x="LMARGIN", new_y="NEXT")
+            pdf.set_font("helvetica", size=10)
+            pdf.multi_cell(epw, 5, safe_text(content))
+            pdf.ln(4)
         
     # 3. Final Findings
     if st.session_state.final_result:
         res = st.session_state.final_result
         pdf.ln(5)
+        pdf.set_fill_color(240, 240, 240)
         pdf.set_font("helvetica", style="B", size=14)
-        pdf.cell(0, 8, "Final Verdict:", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(epw, 12, "3. Final Verdict", fill=True, align="C", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(4)
+        
         pdf.set_font("helvetica", style="B", size=12)
-        pdf.multi_cell(0, 8, f"Culprit: {safe_text(res.get('culprit', 'Unknown'))}")
+        pdf.multi_cell(epw, 8, f"CULPRIT: {safe_text(res.get('culprit', 'Unknown'))}")
         pdf.set_font("helvetica", size=11)
-        pdf.multi_cell(0, 6, f"Reason: {safe_text(res.get('reason', ''))}")
-        pdf.multi_cell(0, 6, f"Confidence: {safe_text(str(res.get('confidence', '')))}")
+        pdf.multi_cell(epw, 6, f"REASONING: {safe_text(res.get('reason', ''))}")
+        pdf.multi_cell(epw, 6, f"CONFIDENCE: {safe_text(str(res.get('confidence', '')))}")
 
     return bytes(pdf.output())
 

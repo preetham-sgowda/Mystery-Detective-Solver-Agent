@@ -1,155 +1,116 @@
 # 🕵️ Mystery Detective Solver Agent
 
-An interactive AI-powered murder mystery solver built with LangGraph ReAct agent, 
-ChatGroq (LLaMA 3.3 70B), FAISS RAG, and Streamlit.
+An interactive, AI-powered forensic investigation system built with **LangChain**, **Groq (LLaMA 3.3)**, **FAISS RAG**, and **Streamlit**. Designed with a premium noir aesthetic, this agent analyzes clues, profiles suspects, and reveals the culprit with sharp logical reasoning.
 
 ---
 
 ## 🏗️ Architecture
 
+The system uses a **Hybrid RAG + One-Shot Reasoning** flow to maximize token efficiency while maintaining deep investigative context.
+
 ```
-Streamlit UI
+Streamlit UI (Noir Aesthetic & PDF Export)
     ↓
-LangGraph ReAct Agent (create_react_agent)
+One-Shot Reasoning Engine (Direct LLM Invoke)
     ↓
-@tool functions: clue_analyzer | suspect_profiler | memory_lookup | web_search
+FAISS Vector Store (Sentence-Transformers)
     ↓
-ChatGroq (llama-3.3-70b-versatile) + MemorySaver
+Context Injection (Clues + Chat History + RAG Results)
     ↓
-FAISS RAG (sentence-transformers all-MiniLM-L6-v2)
+ChatGroq (llama-3-3-70b / llama-3-1-8b)
 ```
+
+---
+
+## ✨ Features
+
+- **🔍 Smart Case Analysis**: Automatically indexes clues into a FAISS vector store for semantic retrieval.
+- **🎭 Detective AI**: Methodical reasoning in a sharp, noir-inspired style.
+- **💬 Interrogation Room**: Interactive chat to ask follow-up questions or provide new evidence.
+- **⚖️ Structured Verdicts**: Every analysis ends with a JSON-backed verdict including the culprit, reasoning, and confidence score.
+- **📄 PDF Case Reports**: Export the entire investigation log and final verdict to a professional PDF report.
+- **🕶️ Premium UI**: Custom dark-walnut noir theme with glassmorphism and vintage typography.
 
 ---
 
 ## ⚡ Quick Start
 
-### 1. Clone / copy the project
+### 1. Project Setup
 
 ```bash
+# Clone or create the directory
 mkdir mystery_detective && cd mystery_detective
-# place app.py and requirements.txt here
-```
 
-### 2. Create a virtual environment (recommended)
-
-```bash
-python -m venv venv
-source venv/bin/activate        # Mac/Linux
-venv\Scripts\activate           # Windows
-```
-
-### 3. Install dependencies
-
-```bash
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-> **Note:** `sentence-transformers` will download the `all-MiniLM-L6-v2` model (~80 MB)
-> on first run. This is cached automatically for subsequent runs.
+> **Note:** `sentence-transformers` downloads the `all-MiniLM-L6-v2` model (~80 MB) on first run, which is then cached.
 
-### 4. Set your GROQ API key
+### 2. Configure API Key
 
-**Option A — Environment variable (recommended):**
-
+**Option A — Environment Variable:**
 ```bash
-# Mac / Linux
-export GROQ_API_KEY="gsk_your_key_here"
-
-# Windows CMD
-set GROQ_API_KEY=gsk_your_key_here
-
-# Windows PowerShell
-$env:GROQ_API_KEY="gsk_your_key_here"
+export GROQ_API_KEY="gsk_your_key_here"  # Mac/Linux
+set GROQ_API_KEY=gsk_your_key_here      # Windows CMD
+$env:GROQ_API_KEY="gsk_your_key_here"   # PowerShell
 ```
 
-**Option B — Enter it directly in the sidebar** when the app loads.
+**Option B — Sidebar Input:**
+Enter your key directly into the app's sidebar when it loads. Get a free key at [console.groq.com](https://console.groq.com).
 
-Get a free key at: https://console.groq.com
-
-### 5. Run the app
+### 3. Run the App
 
 ```bash
 streamlit run app.py
 ```
 
-Open your browser at **http://localhost:8501**
-
 ---
 
 ## 🎮 How to Use
 
-1. **Fill in Case Files** (left sidebar):
-   - *Case Description* — describe the crime scene and circumstances
-   - *Evidence & Clues* — list all clues found
-   - *Suspects* — name each suspect (one per line)
-
-2. Click **🔍 Analyze Case** — the detective will:
-   - Index clues into FAISS
-   - Run ReAct reasoning (tool calls visible in logs)
-   - Ask clarifying questions
-
-3. Chat freely in the **Interrogation Room** to provide more info
-
-4. Click **🎭 Reveal Culprit** to get the final verdict:
-   - Culprit name
-   - Full reasoning
-   - Confidence percentage
-
----
-
-## 🧪 Sample Mystery to Try
-
-**Case Description:**
-Taha was found dead in his locked study at Blackwood Manor. 
-The time of death is estimated between 9 PM and 11 PM. 
-A half-empty glass of whiskey sat on his desk. No signs of forced entry.
-
-**Clues:**
-- A monogrammed handkerchief with the initials "N.U." was found under the desk
-- The poison used was cyanide, tasteless and odorless when dissolved in alcohol
-- The manor's back door was unlocked despite the butler claiming to have locked it at 8 PM
-- A recent will discovered shows Taha changed his beneficiary last week
-- The kitchen staff reported hearing an argument between Taha and his niece Naushin Usman at 8:30 PM
-- Footprints in the garden match a woman's shoe size 6
-
-**Suspects:**
-- Naushin Usman (niece, recently cut from the will)
-- Manohar the butler (employed for 20 years, recently passed over for a raise)
-- Dr. Saniya (family physician, secret affair with the lord)
-- Jameel (estranged son, returned from abroad last week)
-
----
-
-## 📦 Project Structure
-
-```
-mystery_detective/
-├── app.py              # All application code (single file)
-├── requirements.txt    # Python dependencies
-└── README.md           # This file
-```
-
----
-
-## 🔧 Troubleshooting
-
-| Issue | Fix |
-|-------|-----|
-| `ModuleNotFoundError: faiss` | Run `pip install faiss-cpu` |
-| `AuthenticationError` from Groq | Double-check your GROQ_API_KEY |
-| Slow first load | sentence-transformers model is downloading (~80 MB) |
-| `duckduckgo_search` rate limit | Wait 30 seconds and retry; DDG has free tier limits |
-| Streamlit version errors | Upgrade: `pip install --upgrade streamlit` |
+1.  **Fill in Case Files** (Sidebar):
+    - **Case Description**: The "What, When, Where" of the crime.
+    - **Evidence & Clues**: List findings (monogrammed handkerchiefs, poison types, etc.).
+    - **Suspects**: Name the potential culprits.
+2.  Click **🔍 Analyze Case**: The detective indexes the evidence and performs an initial review.
+3.  **Interrogate**: Use the chat box to ask for specific alibis or deeper analysis of certain clues.
+4.  Click **🎭 Reveal Culprit**: Get the final deduction and the official verdict.
+5.  **Export**: Download the **PDF Report** for the official case file.
 
 ---
 
 ## 🧠 Tech Stack
 
 | Component | Library | Purpose |
-|-----------|---------|---------|
-| UI | Streamlit | Chat interface & controls |
-| Agent | LangGraph `create_react_agent` | ReAct reasoning loop |
-| LLM | ChatGroq + llama-3.3-70b | Inference |
-| Memory | `MemorySaver` | Conversation continuity |
-| RAG | FAISS + sentence-transformers | Clue retrieval |
-| Search | duckduckgo-search | External context |
+| :--- | :--- | :--- |
+| **UI** | Streamlit | Responsive dashboard & Noir styling |
+| **Logic** | LangChain | Orchestration & Tooling |
+| **LLM** | Groq (LLaMA 3.3 70B) | High-speed, high-quality reasoning |
+| **Vector DB** | FAISS | Semantic clue retrieval (RAG) |
+| **Embeddings** | Sentence-Transformers | Clue indexing (all-MiniLM-L6-v2) |
+| **Export** | FPDF | Professional PDF generation |
+| **Search** | DuckDuckGo | External investigative context |
+
+---
+
+## 🔧 Troubleshooting
+
+| Issue | Solution |
+| :--- | :--- |
+| **Rate Limit Exceeded** | Switch to `llama-3.1-8b-instant` in the sidebar or wait for the cooldown. |
+| **FAISS/Numpy Errors** | Ensure you have `faiss-cpu` installed: `pip install faiss-cpu`. |
+| **PDF Format Issues** | The exporter cleans special characters automatically; stick to standard ASCII where possible. |
+| **Missing API Key** | Ensure `GROQ_API_KEY` is in your `.env` or set in the sidebar. |
+
+---
+
+## 📦 Project Structure
+
+```text
+Mystery-Detective-Solver-Agent/
+├── app.py              # Main application logic & UI
+├── requirements.txt    # Python dependencies
+├── README.md           # Documentation
+└── .env               # (Optional) API key storage
+```

@@ -748,6 +748,11 @@ def generate_case_pdf() -> bytes:
         if not isinstance(txt, str):
             txt = str(txt)
         txt = txt.replace("—", "-").replace("🕵️", "Det.").replace("⚠️", "Warning:")
+        
+        # FPDF crashes if it hits a massive string without any spaces (like a long URL or markdown divider)
+        # We forcefully add a space into any unbroken sequence of 60+ characters to allow wrapping.
+        txt = re.sub(r'(\S{60})', r'\1 ', txt)
+        
         # Simplify text characters for standard helvetica and replace unicode
         return txt.encode('latin-1', 'replace').decode('latin-1')
 

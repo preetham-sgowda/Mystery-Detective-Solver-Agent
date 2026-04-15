@@ -632,17 +632,15 @@ def web_search(query: str) -> str:
 
 
 # ─────────────────────────────────────────────
-# Build / cache the LangGraph Agent
+# Run Agent (One-Shot with FAISS Injection)
 # ─────────────────────────────────────────────
 SYSTEM_PROMPT = """You are Detective AI, a brilliant and methodical murder mystery solver.
 Your reasoning style: sharp, logical, noir.
 
 WORKFLOW:
-1. Use clue_analyzer to dissect provided clues.
-2. Use suspect_profiler to profile each suspect.
-3. Use memory_lookup to cross-reference stored fragments.
-4. Use web_search only if you need forensic background.
-5. Synthesize ALL evidence and name the culprit — ALWAYS.
+1. Review the provided Case Database Clues (if any).
+2. Synthesize ALL evidence and the user's latest input.
+3. Name the culprit — ALWAYS.
 
 CRITICAL RULES:
 - You MUST always name a specific culprit. Never say "I conclude that:" and stop.
@@ -662,62 +660,53 @@ FINAL ANSWER FORMAT — end EVERY response with this exact block:
 Be decisive. A detective who does not name a suspect has failed.
 """
 
-
-def build_agent(llm):
-    tools = [clue_analyzer, suspect_profiler, memory_lookup, web_search]
-    agent = create_react_agent(
-        model=llm,
-        tools=tools,
-        checkpointer=st.session_state.memory,
-        prompt=SYSTEM_PROMPT,
-    )
-    return agent
-
-
-def get_agent():
-    if st.session_state.agent is None:
-        llm = get_llm()
-        if llm is None:
-            return None
-        st.session_state.agent = build_agent(llm)
-    return st.session_state.agent
-
-
-# ─────────────────────────────────────────────
-# Run Agent
-# ─────────────────────────────────────────────
 def run_agent(user_input: str) -> str:
-    agent = get_agent()
-    if agent is None:
+    llm = get_llm()
+    if llm is None:
         return "⚠️ GROQ_API_KEY not set. Please enter your API key in the sidebar."
 
-    config = {"configurable": {"thread_id": st.session_state.thread_id}}
+    # Grab FAISS context automatically instead of using a token-heavy LangGraph tool loop
     try:
-        response = agent.invoke(
-            {"messages": [HumanMessage(content=user_input)]},
-            config=config,
-        )
+        model = load_embedding_model()
+        store = GLOBAL_CLUE_STORE
+        docs = store.search(user_input, model, k=3)
+        db_context = "\n".join([f"- {d}" for d in docs]) if docs else "No additional clues found."
+    except Exception:
+        db_context = "No additional clues found."
+
+    history = [SystemMessage(content=SYSTEM_PROMPT)]
+    
+    # Grab the last 4 messages to save tokens but retain basic context
+    recent_messages = st.session_state.messages[-4:] if len(st.session_state.messages) > 0 else []
+    for msg in recent_messages:
+        if msg["role"] == "user":
+            history.append(HumanMessage(content=msg["content"]))
+        elif msg["role"] == "assistant":
+            # Strip out JSON blob from assistant memory to save tokens
+            clean = re.sub(r"```json.*?```", "", msg["content"], flags=re.DOTALL).strip()
+            clean = re.sub(r'\{[^{}]*"culprit"[^{}]*\}', "", clean, flags=re.DOTALL).strip()
+            history.append(AIMessage(content=clean))
+            
+    enhanced_input = f"{user_input}\n\n[CASE DATABASE CLUES]\n{db_context}"
+    history.append(HumanMessage(content=enhanced_input))
+    
+    try:
+        response = llm.invoke(history)
+        return response.content
     except Exception as e:
         err = str(e)
         if "rate_limit_exceeded" in err or "429" in err:
-            # Parse wait time from error message if available
             wait_match = re.search(r"Please try again in ([\d\w\.]+)", err)
             wait_time = wait_match.group(1) if wait_match else "a while"
-            model = st.session_state.get("selected_model", "llama-3.1-8b-instant")
+            model_name = st.session_state.get("selected_model", "llama-3.1-8b-instant")
             return (
-                f"🚦 **Rate limit reached** for `{model}`.\n\n"
+                f"🚦 **Rate limit reached** for `{model_name}`.\n\n"
                 f"- ⏳ Please wait **{wait_time}** before retrying, or\n"
                 f"- 🔄 Switch to **LLaMA 3.1 8B Instant** in the sidebar (500k tokens/day limit), or\n"
                 f"- 🔑 Use a different Groq API key.\n\n"
                 f"*Upgrade at https://console.groq.com/settings/billing for higher limits.*"
             )
         return f"❌ Agent error: {err}"
-
-    # Extract final AI message
-    for msg in reversed(response["messages"]):
-        if isinstance(msg, AIMessage) and msg.content:
-            return msg.content
-    return "The detective has no response at this time."
 
 
 def extract_json_result(text: str) -> Optional[dict]:

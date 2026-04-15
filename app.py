@@ -29,6 +29,9 @@ from sentence_transformers import SentenceTransformer
 # DuckDuckGo Search
 from duckduckgo_search import DDGS
 
+# PDF Export
+from fpdf import FPDF
+
 # ─────────────────────────────────────────────
 # Page Config
 # ─────────────────────────────────────────────
@@ -736,6 +739,76 @@ def load_case_into_faiss(clues: str):
         st.session_state.clue_store.add(sentences, model)
 
 
+def generate_case_pdf() -> bytes:
+    """Generate a PDF report of the active case and conversation."""
+    pdf = FPDF()
+    pdf.add_page()
+    
+    def safe_text(txt):
+        if not isinstance(txt, str):
+            txt = str(txt)
+        txt = txt.replace("—", "-").replace("🕵️", "Det.").replace("⚠️", "Warning:")
+        # Simplify text characters for standard helvetica and replace unicode
+        return txt.encode('latin-1', 'replace').decode('latin-1')
+
+    pdf.set_font("helvetica", style="B", size=16)
+    pdf.cell(0, 10, "Mystery Detective Case Report", new_x="LMARGIN", new_y="NEXT", align="C")
+    pdf.ln(5)
+    
+    # 1. Case Details
+    pdf.set_font("helvetica", style="B", size=14)
+    pdf.cell(0, 8, "Initial Case Details:", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("helvetica", size=11)
+    pdf.multi_cell(0, 6, safe_text(st.session_state.case_description))
+    pdf.ln(4)
+
+    if st.session_state.suspects.strip():
+        pdf.set_font("helvetica", style="B", size=12)
+        pdf.cell(0, 8, "Suspects:", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("helvetica", size=11)
+        pdf.multi_cell(0, 6, safe_text(st.session_state.suspects))
+        pdf.ln(2)
+
+    if st.session_state.clues.strip():
+        pdf.set_font("helvetica", style="B", size=12)
+        pdf.cell(0, 8, "Initial Clues:", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("helvetica", size=11)
+        pdf.multi_cell(0, 6, safe_text(st.session_state.clues))
+        pdf.ln(6)
+
+    # 2. Conversation
+    if st.session_state.messages:
+        pdf.set_font("helvetica", style="B", size=14)
+        pdf.cell(0, 8, "Investigation Log:", new_x="LMARGIN", new_y="NEXT")
+        for msg in st.session_state.messages:
+            role = "Detective" if msg["role"] == "assistant" else "Investigator"
+            content = safe_text(msg["content"])
+            
+            # Hide raw JSON
+            content_clean = re.sub(r"```json.*?```", "[System: JSON format saved internally]", content, flags=re.DOTALL)
+            content_clean = re.sub(r'\{[^{}]*"culprit"[^{}]*\}', "[System: JSON format saved internally]", content_clean, flags=re.DOTALL).strip()
+            
+            pdf.set_font("helvetica", style="B", size=11)
+            pdf.multi_cell(0, 6, f"{role}:")
+            pdf.set_font("helvetica", size=11)
+            pdf.multi_cell(0, 6, content_clean)
+            pdf.ln(3)
+        
+    # 3. Final Findings
+    if st.session_state.final_result:
+        res = st.session_state.final_result
+        pdf.ln(5)
+        pdf.set_font("helvetica", style="B", size=14)
+        pdf.cell(0, 8, "Final Verdict:", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("helvetica", style="B", size=12)
+        pdf.multi_cell(0, 8, f"Culprit: {safe_text(res.get('culprit', 'Unknown'))}")
+        pdf.set_font("helvetica", size=11)
+        pdf.multi_cell(0, 6, f"Reason: {safe_text(res.get('reason', ''))}")
+        pdf.multi_cell(0, 6, f"Confidence: {safe_text(str(res.get('confidence', '')))}")
+
+    return bytes(pdf.output())
+
+
 # ─────────────────────────────────────────────
 # Sidebar
 # ─────────────────────────────────────────────
@@ -812,6 +885,21 @@ with st.sidebar:
                 del st.session_state[key]
         init_state()
         st.rerun()
+
+    if st.session_state.messages:
+        st.markdown("---")
+        try:
+            pdf_bytes = generate_case_pdf()
+            st.download_button(
+                label="📄 Export Case to PDF",
+                data=pdf_bytes,
+                file_name="Mystery_Case_Report.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                help="Download the entire case file and investigation log as a PDF."
+            )
+        except Exception as e:
+            st.error(f"Could not generate PDF: {e}")
 
     st.markdown("---")
     active_model = st.session_state.get("selected_model", "llama-3.1-8b-instant")
